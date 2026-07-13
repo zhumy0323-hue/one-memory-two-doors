@@ -1,0 +1,21 @@
+# /etc/systemd/system/companion.service — systemd 常驻单元示例。
+# 装法:改路径 → cp deploy/companion.service /etc/systemd/system/ → systemctl daemon-reload
+#       → systemctl enable --now companion
+# 热更新技巧见 ARCHITECTURE.md「部署」:tmux kill-session -t hub = 只重启 hub、保留 cc 会话。
+
+[Unit]
+Description=AI companion hub + cc supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+ExecStart=/path/to/this/repo/deploy/supervise.sh
+ExecStop=/bin/sh -c '/usr/bin/tmux kill-session -t hub 2>/dev/null; /usr/bin/tmux kill-session -t cc 2>/dev/null; true'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

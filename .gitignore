@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────────────
+#  绝不提交:密钥 & 一切私人运行数据
+#  (open-source 前务必确认这些从未进过 git 历史)
+# ─────────────────────────────────────────────────────────────
+
+# 密钥 / 配置
+.env
+.env.*
+!.env.example
+vapid-keys.json
+
+# 运行时私人数据(全部聊天/记忆/日记/情绪/健康/位置…)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+history/
+audit.jsonl
+
+# 各功能存盘(JSON 状态,均含私人内容)
+chat_session.json
+conv-hist.json
+custom_characters.json
+diary.json
+dreams.json
+drive_state.json
+emotions.json
+goal.json
+health.json
+kv.json
+ledger.json
+location.json
+/manifest.json
+/src/manifest.json
+moments.json
+moods.json
+notepad.json
+phone_state.json
+proactive_state.json
+promises.json
+quest.json
+quest-history.json
+question_today.json
+regimen.json
+safe_state.json
+shares.json
+story.json
+todos.json
+xp.json
+
+# 私人人设(用 *.example 模板代替提交)
+personas/*.txt
+personas/*.md
+!personas/*.example.txt
+!personas/*.example.md
+CLAUDE.md
+
+# 构建 / 依赖 / 杂项
+node_modules/
+dist/
+/tmp/
+*.log
+.DS_Store
+bun.lockb

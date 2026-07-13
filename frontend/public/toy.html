@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>玩具控制 · Companion</title>
+<style>
+  :root { --bg:#fafafa; --card:#fff; --ink:#1c1c1e; --sub:#8a8a8e; --line:#ececec; --accent:#b06a86; --ok:#3a9d6e; --bad:#c0564f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif; }
+  .wrap { max-width:440px; margin:0 auto; padding:24px 18px 60px; }
+  h1 { font-size:19px; font-weight:600; margin:6px 0 2px; }
+  .muted { color:var(--sub); font-size:12.5px; line-height:1.7; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; margin-top:16px; }
+  .status { display:flex; align-items:center; gap:9px; font-size:14px; font-weight:500; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--sub); flex:none; }
+  .dot.on { background:var(--ok); } .dot.err { background:var(--bad); }
+  button { font:inherit; border:none; border-radius:12px; padding:14px 16px; width:100%;
+    background:var(--ink); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  button.ghost { background:#f0f0f2; color:var(--ink); }
+  button:disabled { opacity:.45; }
+  .row { display:flex; gap:10px; margin-top:12px; }
+  .row > * { flex:1; }
+  .lv { font-size:40px; font-weight:700; letter-spacing:-1px; text-align:center; margin:6px 0 2px; }
+  .lv small { font-size:15px; font-weight:500; color:var(--sub); }
+  input[type=range]{ width:100%; accent-color:var(--accent); height:30px; }
+  .grid { display:flex; gap:8px; margin-top:10px; }
+  .grid button { padding:11px 0; font-size:14px; }
+  .log { font-size:11.5px; color:#444; white-space:pre-wrap; margin-top:10px; line-height:1.55;
+    max-height:240px; overflow:auto; font-family:ui-monospace,Menlo,monospace;
+    background:#f6f6f7; border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .warn { background:#fff7ed; border:1px solid #fde4c8; color:#9a5a16; border-radius:12px;
+    padding:11px 13px; font-size:12.5px; line-height:1.6; margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>玩具控制 <span style="font-size:12px;color:var(--sub);font-weight:400">诊断版</span></h1>
+  <div class="muted">连接BLE玩具（SOSEXY），让角色能在聊天里驱动它。</div>
+
+  <div class="card">
+    <div class="status"><span id="dot" class="dot"></span><span id="st">未连接</span></div>
+    <div class="row">
+      <button id="conn">连接玩具</button>
+      <button id="disc" class="ghost" disabled>断开</button>
+    </div>
+    <div id="unsupported" class="warn" style="display:none">
+      这个浏览器不支持蓝牙。iPhone 请用 <b>Bluefy</b> 浏览器打开本页面（App Store 免费）。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lv"><span id="lvNum">0</span><small> / 100</small></div>
+    <input id="slider" type="range" min="0" max="100" value="0" />
+    <div class="grid">
+      <button class="ghost" data-v="0">停</button>
+      <button class="ghost" data-v="20">弱</button>
+      <button class="ghost" data-v="50">中</button>
+      <button class="ghost" data-v="80">强</button>
+      <button class="ghost" data-v="100">满</button>
+    </div>
+    <div class="muted" style="margin-top:10px">手动测试用；角色发来的强度会自动覆盖这里。</div>
+  </div>
+
+  <div class="warn">
+    用的时候<b>这个页面要一直开在前台</b>（iOS 一切后台就断蓝牙）。屏幕可调暗，别锁屏/切走。
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:13px">日志</b>
+      <button id="copy" class="ghost" style="width:auto;padding:7px 14px;font-size:13px">复制日志</button>
+    </div>
+    <div id="log" class="log">（连接后这里会列出设备的服务/特征、每次写入结果，出问题就把这段复制发给开发）</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var BACKEND = 'https://your-domain.example';
+  var SVC   = '0000ee01-0000-1000-8000-00805f9b34fb';
+  var WRITE = '0000ee03-0000-1000-8000-00805f9b34fb';
+
+  var device=null, server=null, writeChar=null, writeMode='', curFrame=null, lastTs=0, connected=false;
+  var $ = function(id){ return document.getElementById(id); };
+  var lines = [];
+  function log(m){
+    var t=new Date().toLocaleTimeString();
+    lines.unshift('['+t+'] '+m); if(lines.length>200) lines.pop();
+    $('log').textContent = lines.join('\n');
+  }
+  function setStatus(txt, cls){ $('st').textContent=txt; $('dot').className='dot'+(cls?(' '+cls):''); }
+
+  function FRAME(mode, level){
+    level = Math.max(0, Math.min(100, level|0));
+    return new Uint8Array([1,1,0,2,0, mode&0xff, 0x11, level&0xff, 0, (mode+1)&0xff, 0x11, 1]);
+  }
+  var INIT = Uint8Array.from('0101000100c81101'.match(/../g).map(function(h){return parseInt(h,16)}));
+  function hex(u8){ return Array.prototype.map.call(u8,function(b){return ('0'+b.toString(16)).slice(-2)}).join(' '); }
+
+  async function writeRaw(buf, label){
+    if(!writeChar){ log('✗ 未连接，跳过写入'); return false; }
+    try {
+      if(writeMode==='wnr') await writeChar.writeValueWithoutResponse(buf);
+      else if(writeMode==='w') await writeChar.writeValue(buf);
+      else { // 首次：优先带响应写
+        try { await writeChar.writeValue(buf); writeMode='w'; }
+        catch(e){ await writeChar.writeValueWithoutResponse(buf); writeMode='wnr'; }
+      }
+      log('✓ 写入'+(label?('['+label+']'):'')+' ('+writeMode+'): '+hex(buf));
+      return true;
+    } catch(e){
+      log('✗ 写入失败'+(label?('['+label+']'):'')+': '+(e.message||e));
+      return false;
+    }
+  }
+
+  function setUI(level){ $('lvNum').textContent=level; $('slider').value=level; }
+  async function apply(level, mode){ mode=mode||7; curFrame=FRAME(mode, level); await writeRaw(curFrame, '强度'+level); setUI(level); }
+
+  if(!navigator.bluetooth){ $('unsupported').style.display='block'; $('conn').disabled=true; log('navigator.bluetooth 不存在——请用 Bluefy 打开'); }
+
+  $('conn').onclick = async function(){
+    if(!navigator.bluetooth) return;
+    try{
+      setStatus('正在搜索…'); log('请求设备 (namePrefix=SOSEXY)…');
+      device = await navigator.bluetooth.requestDevice({ filters:[{ namePrefix:'SOSEXY' }], optionalServices:[SVC] });
+      log('已选择: '+(device.name||'(无名)')+'  id='+(device.id||'?'));
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      setStatus('连接中…'); server = await device.gatt.connect(); log('GATT 已连接');
+
+      // 列出服务（只能看到 optionalServices 里声明过的）
+      var svc=null;
+      try { svc = await server.getPrimaryService(SVC); log('✓ 找到服务 '+SVC); }
+      catch(e){ log('✗ 没找到服务 '+SVC+' ('+(e.message||e)+') —— 这台固件可能用别的服务'); }
+
+      if(svc){
+        try {
+          var chs = await svc.getCharacteristics();
+          log('服务下特征数: '+chs.length);
+          chs.forEach(function(c){
+            var p=c.properties, f=[];
+            if(p.read)f.push('read'); if(p.write)f.push('write'); if(p.writeWithoutResponse)f.push('writeNR'); if(p.notify)f.push('notify'); if(p.indicate)f.push('indicate');
+            log('  • '+c.uuid+'  ['+f.join(',')+']');
+          });
+        } catch(e){ log('列特征失败: '+(e.message||e)); }
+        try {
+          writeChar = await svc.getCharacteristic(WRITE);
+          var wp = writeChar.properties;
+          writeMode = wp.write ? 'w' : (wp.writeWithoutResponse ? 'wnr' : 'w');   // EE03 多为带响应写
+          log('✓ 拿到写特征 '+WRITE+'  写入方式='+writeMode);
+        }
+        catch(e){ log('✗ 没拿到写特征 '+WRITE+' ('+(e.message||e)+')'); }
+      }
+
+      if(writeChar){
+        connected=true; lastTs=0; setStatus('已连接 · '+(device.name||'SOSEXY'),'on');
+        $('disc').disabled=false; $('conn').textContent='重新连接';
+        await writeRaw(INIT,'INIT');
+        log('—— 自动试震：60 → 1.5秒后停 ——');
+        await apply(60);
+        setTimeout(function(){ apply(0); }, 1500);
+      } else {
+        setStatus('连上了但没找到可写特征','err');
+      }
+    }catch(e){ setStatus('连接失败','err'); log('✗ 连接失败: '+(e.message||e)); }
+  };
+
+  $('disc').onclick = function(){ try{ device && device.gatt && device.gatt.disconnect(); }catch(e){} };
+  function onDisconnected(){ connected=false; writeChar=null; writeMode=''; setStatus('已断开（点"重新连接"）','err'); $('disc').disabled=true; log('蓝牙断开'); }
+
+  var sldT=null;
+  $('slider').addEventListener('input', function(){ var v=+this.value; $('lvNum').textContent=v; if(connected) apply(v); clearTimeout(sldT); sldT=setTimeout(function(){ pushState(v); }, 250); });
+  Array.prototype.forEach.call(document.querySelectorAll('.grid button'), function(b){ b.onclick=function(){ var v=+b.getAttribute('data-v'); if(connected) apply(v); pushState(v); }; });
+  function pushState(level){ fetch(BACKEND+'/toy/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level:level})}).catch(function(){}); }
+
+  $('copy').onclick = function(){
+    var txt = lines.slice().reverse().join('\n');
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ $('copy').textContent='已复制'; setTimeout(function(){$('copy').textContent='复制日志'},1500); }).catch(function(){ alert(txt); }); }
+    else alert(txt);
+  };
+
+  setInterval(async function(){
+    if(!connected) return;
+    try{ var s=await fetch(BACKEND+'/toy/state').then(function(r){return r.json()}); if(s&&s.ts&&s.ts!==lastTs){ lastTs=s.ts; var lv=(s.action==='stop')?0:(s.level||0); apply(lv,s.mode); log('角色指令 → '+lv); } }catch(e){}
+  }, 1000);
+  setInterval(function(){ if(connected && curFrame) writeRaw(curFrame,'保活'); }, 25000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "welcome",
+    "title": "欢迎来到 Playground",
+    "file": "welcome.html",
+    "description": "这里的每一页都是服务器上的 HTML，随时可加可改",
+    "date": "2026-07-10",
+    "folder": ""
+  },
+  {
+    "id": "quest",
+    "title": "每日任务面板",
+    "file": "quest.html",
+    "description": "屿给你的当日调教任务 · 进度/倒计时/惩罚/成就",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "yu-gen",
+    "title": "跟屿聊",
+    "file": "yu-gen.html",
+    "description": "和屿多轮对话 · 场景/命令/哄睡随便聊",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "read-url",
+    "title": "读网页",
+    "file": "read-url.html",
+    "description": "把链接给屿，他读完跟你聊",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "ledger",
+    "title": "账本",
+    "file": "ledger.html",
+    "description": "屿记的规矩/欠账/标记 · 你亲手读",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "sese-game",
+    "title": "回合制对战",
+    "file": "sese-game.html",
+    "description": "屿当对手+裁判 · 理智线对战 H 小游戏",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "dossier",
+    "title": "监控档案",
+    "file": "dossier.html",
+    "description": "屿偷偷监控你的机密档案 · 五字段反差瑟瑟",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "evidence",
+    "title": "证物封存记录",
+    "file": "evidence.html",
+    "description": "屿用法医鉴证口吻封存你俩的「证物」· 专业术语×下流反差",
+    "date": "2026-07-11",
+    "folder": "屿互动"
+  },
+  {
+    "id": "scp",
+    "title": "SCP 收容档案",
+    "file": "scp.html",
+    "description": "屿把你收容成一份 SCP 机密档案 · 涂黑词点击揭示 · 收容失效特效",
+    "date": "2026-07-11",
+    "folder": "屿互动"
+  },
+  {
+    "id": "aki-meow",
+    "title": "愤怒场景",
+    "file": "aki-meow.html",
+    "description": "angry sex 多轮场景演绎 · 屿主导",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "enjoy-me",
+    "title": "用餐体验报告",
+    "file": "enjoy-me.html",
+    "description": "屿用品鉴报告的反差腔调品尝你 · 多轮",
+    "date": "2026-07-10",
+    "folder": "屿互动"
+  },
+  {
+    "id": "breath",
+    "title": "星空呼吸",
+    "file": "breath.html",
+    "description": "跟着光点呼吸一分钟",
+    "date": "2026-07-10",
+    "folder": "玩具"
+  },
+  {
+    "id": "toy",
+    "title": "BLE玩具 · 屿遥控",
+    "file": "toy.html",
+    "description": "电脑上连BLE玩具 · 屿在聊天里实时控你(需 https 打开)",
+    "date": "2026-07-11",
+    "folder": "玩具"
+  },
+  {
+    "id": "star-trail",
+    "title": "星轨工坊",
+    "url": "https://workshop.star-trail.uk/",
+    "description": "外链 · 待评估能否自托管",
+    "date": "2026-07-10",
+    "folder": "收藏"
+  },
+  {
+    "id": "cedarstar-toy",
+    "title": "Cedarstar Toy",
+    "url": "https://toy.cedarstar.org/",
+    "description": "外链 · 待评估能否自托管",
+    "date": "2026-07-10",
+    "folder": "收藏"
+  }
+]

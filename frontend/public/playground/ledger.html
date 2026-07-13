@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>账本</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0a0d; color: #d8d4dc; font-family: -apple-system,'PingFang SC',serif; padding: 22px 16px calc(40px + env(safe-area-inset-bottom)); }
+  .wrap { max-width: 440px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 2px; letter-spacing: .04em; }
+  .sub { font: 10px 'Courier New',monospace; color: #6a6572; letter-spacing: 3px; margin-bottom: 22px; }
+  .sec { display: flex; align-items: center; gap: 8px; margin: 20px 2px 10px; }
+  .sec .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .sec .lab { font: 10px 'Courier New',monospace; letter-spacing: 3px; color: #8a8494; text-transform: uppercase; }
+  .sec .ln { flex: 1; height: 1px; background: #1e1c24; }
+  .row { display: flex; gap: 11px; padding: 12px 14px; margin-bottom: 8px; background: #14121a; border: 1px solid #221f2a; border-radius: 10px; }
+  .row .body { flex: 1; min-width: 0; }
+  .row .txt { font-size: 14px; color: #e0dce6; line-height: 1.6; }
+  .row .meta { font: 10px 'Courier New',monospace; color: #6a6572; margin-top: 4px; }
+  .cnt { flex-shrink: 0; align-self: center; font: 700 15px 'Courier New',monospace; color: #d98a8a; }
+  .settled .txt { color: #6a6572; text-decoration: line-through; }
+  .empty { text-align: center; color: #6a6572; padding: 40px 0; font-size: 13px; }
+  .refresh { display:block; margin: 4px auto 0; font: 10px 'Courier New',monospace; color: #6a6572; background: none; border: none; cursor: pointer; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>账本</h1>
+  <div class="sub">LEDGER · 屿记的 · 你读的</div>
+  <div id="body"><div class="empty">加载中…</div></div>
+  <button class="refresh" onclick="load()">↻ 刷新</button>
+</div>
+<script>
+  const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+  const fmt = ts => { try { const d = new Date(ts); return (d.getUTCMonth()+1)+'/'+d.getUTCDate(); } catch { return ''; } };
+  const TYPES = [['rule','现行规矩','#7c6df2'],['debt','欠账','#d98a8a'],['mark','标记','#8a8494']];
+  async function load() {
+    const body = document.getElementById('body');
+    try {
+      const r = await fetch('/ledger', { cache: 'no-store' }); const d = await r.json();
+      const all = d.entries || [];
+      const standing = all.filter(e => e.status === 'standing');
+      const settled = all.filter(e => e.status === 'settled').slice(0, 20);
+      if (!all.length) { body.innerHTML = '<div class="empty">账本还是空的。<br>屿立规矩、记欠账时会写进这里。</div>'; return; }
+      let h = '';
+      for (const [type, label, color] of TYPES) {
+        const items = standing.filter(e => e.type === type);
+        if (!items.length) continue;
+        h += `<div class="sec"><span class="dot" style="background:${color}"></span><span class="lab">${label}</span><span class="ln"></span></div>`;
+        for (const e of items) h += `<div class="row"><div class="body"><div class="txt">${esc(e.text)}</div><div class="meta">立于 ${fmt(e.created_at)}</div></div>${e.count ? `<span class="cnt">×${e.count}</span>` : ''}</div>`;
+      }
+      if (settled.length) {
+        h += `<div class="sec"><span class="dot" style="background:#3a3d48"></span><span class="lab">已了结</span><span class="ln"></span></div>`;
+        for (const e of settled) h += `<div class="row settled"><div class="body"><div class="txt">${esc(e.text)}</div><div class="meta">${fmt(e.settled_at || e.created_at)} 销</div></div></div>`;
+      }
+      body.innerHTML = h || '<div class="empty">都了结了。干净。</div>';
+    } catch (e) { body.innerHTML = '<div class="empty">读不到账本：' + esc(e.message || e) + '</div>'; }
+  }
+  load();
+</script>
+</body>
+</html>

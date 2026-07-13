@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<title>星空呼吸</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 50% 30%, #1b2340 0%, #0c0f1e 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, 'PingFang SC', sans-serif; }
+  .orb { width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle at 38% 35%, #cdd9ff, #7a88c8 55%, #4a5590); box-shadow: 0 0 60px 18px rgba(122,136,200,0.35); animation: breathe 8s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { transform: scale(0.72); } 45% { transform: scale(1.12); } 60% { transform: scale(1.12); } }
+  .hint { margin-top: 44px; color: #aeb8dd; font-size: 15px; letter-spacing: 0.35em; animation: hintswap 8s ease-in-out infinite; }
+  @keyframes hintswap { 0%, 40%, 100% { opacity: 0.9; } 46%, 58% { opacity: 0.35; } }
+  .star { position: fixed; border-radius: 50%; background: #dfe6ff; opacity: 0.7; animation: tw 3s ease-in-out infinite; }
+  @keyframes tw { 50% { opacity: 0.15; } }
+</style>
+</head>
+<body>
+  <div class="orb"></div>
+  <div class="hint">吸 气 · 呼 气</div>
+  <script>
+    for (let i = 0; i < 40; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = 1 + Math.random() * 2;
+      s.style.cssText += `width:${size}px;height:${size}px;left:${Math.random()*100}vw;top:${Math.random()*100}vh;animation-delay:${Math.random()*3}s`;
+      document.body.appendChild(s);
+    }
+    if (navigator.vibrate) setInterval(() => navigator.vibrate(10), 8000);
+  </script>
+</body>
+</html>

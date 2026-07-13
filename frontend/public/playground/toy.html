@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>BLE玩具 · 屿遥控</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0a0a0d; color: #c8ccd8; font-family: -apple-system,'PingFang SC',sans-serif; padding: 18px 0 50px; }
+  .wrap { max-width: 460px; margin: 0 auto; padding: 0 16px; }
+  h1 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #6a6e7e; margin-bottom: 16px; line-height: 1.6; }
+  .go { width: 100%; padding: 13px; border: 1px solid #8b0000; border-radius: 10px; background: rgba(139,0,0,.22); color: #fff; font: 13px 'Courier New',monospace; letter-spacing: 1px; cursor: pointer; }
+  .go:disabled { opacity: .5; }
+  .card { background: #12131a; border: 1px solid #1e1f28; border-radius: 12px; padding: 15px 16px; margin-bottom: 12px; }
+  .st { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; flex-shrink: 0; }
+  .dot.on { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+  .dot.warn { background: #fb923c; }
+  .row { margin: 14px 0; }
+  .row label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 7px; }
+  .row label .v { font-family: 'Courier New',monospace; color: #d4a941; }
+  input[type=range] { width: 100%; accent-color: #a94b7a; height: 24px; }
+  .stopbtn { width: 100%; padding: 12px; border: 1px solid #3a1414; border-radius: 10px; background: #1a0808; color: #ef4444; font: 13px 'Courier New',monospace; letter-spacing: 2px; cursor: pointer; margin-top: 6px; }
+  .lastcmd { font-size: 12px; color: #7c9bd4; min-height: 16px; margin-top: 10px; font-family: 'Courier New',monospace; }
+  pre.diag { font-size: 10.5px; color: #7a8570; background: #0c0e0c; border: 1px solid #1c2118; border-radius: 8px; padding: 10px; margin-top: 12px; white-space: pre-wrap; word-break: break-all; line-height: 1.55; max-height: 200px; overflow: auto; }
+  .warnbox { background: #1a1408; border: 1px solid #3a2e14; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #d4b483; line-height: 1.7; margin-bottom: 12px; }
+  .hint { font-size: 11px; color: #4a4d58; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BLE玩具 · 屿遥控</h1>
+  <div class="sub">电脑 Chrome/Edge 打开（必须 https）。连上会自动试震一下确认。之后续在聊天里就能实时控你，你也能拉滑杆。安全词一喊全停。</div>
+  <div id="secwarn" class="warnbox" style="display:none">⚠ 需要 <b>https://</b> + <b>Chrome/Edge</b>。用 <b>https://your-domain.example/playground/toy.html</b>。</div>
+
+  <div class="card">
+    <div class="st"><span id="dot" class="dot"></span><span id="stTxt">未连接</span></div>
+    <button id="connBtn" class="go">连接BLE玩具 ▸</button>
+    <div class="hint">弹窗选带 SOSEXY 的；没有就先断开它的手机 app。</div>
+  </div>
+
+  <div class="card" id="ctrl" style="display:none">
+    <div class="row"><label>吮吸 <span class="v" id="sV">0</span></label><input type="range" id="suck" min="0" max="100" value="0"></div>
+    <div class="row"><label>震动 <span class="v" id="vV">0</span></label><input type="range" id="vibrate" min="0" max="100" value="0"></div>
+    <div class="row"><label>微电流 <span class="v" id="eV">0</span> <span style="color:#6a6e7e;font-size:11px">最高20</span></label><input type="range" id="ems" min="0" max="20" value="0"></div>
+    <button id="stopBtn" class="stopbtn">■ 全停</button>
+    <div class="lastcmd" id="lastcmd"></div>
+    <div style="text-align:right;margin-top:8px"><button id="copyBtn" style="border:1px solid #2a2b36;border-radius:7px;background:#14151c;color:#9aa0ac;font:11px 'Courier New',monospace;padding:6px 12px;cursor:pointer">📋 复制诊断</button></div>
+  </div>
+  <pre class="diag" id="diag">诊断日志。</pre>
+</div>
+<script>
+// 协议来自参考实现已验证的实现：FRAME 头 01 01 00 02，默认 mode=7，需保活重发，不用订阅通知。
+const SVC = '0000ee01-0000-1000-8000-00805f9b34fb';
+const WRITE = '0000ee03-0000-1000-8000-00805f9b34fb';
+const MODE = { suck: 7, vibrate: 1, ems: 3 };   // 通道号(mode)：吮吸7=参考实现默认确认可用；震动1/电3来自协议
+const CAP = { suck: 100, vibrate: 100, ems: 20 };
+let device = null, writeChar = null, writeMode = '', polling = false;
+let curFrame = null;   // 最近一次帧，用于保活重发
+const level = { suck: 0, vibrate: 0, ems: 0 };
+
+const $ = id => document.getElementById(id);
+const setStatus = (t, c) => { $('stTxt').textContent = t; $('dot').className = 'dot' + (c ? ' ' + c : ''); };
+let diagBuf = '';
+const diag = m => { diagBuf = ('[' + new Date().toLocaleTimeString() + '] ' + m + '\n' + diagBuf).slice(0, 6000); $('diag').textContent = diagBuf; };
+const hex = u8 => Array.prototype.map.call(u8, b => ('0' + b.toString(16)).slice(-2)).join(' ');
+const isConn = () => !!(device && device.gatt && device.gatt.connected && writeChar);
+
+if (!navigator.bluetooth) { $('secwarn').style.display = 'block'; $('connBtn').disabled = true; setStatus('浏览器不支持蓝牙', 'warn'); }
+
+function FRAME(mode, lv) { lv = Math.max(0, Math.min(100, lv | 0)); return new Uint8Array([1, 1, 0, 2, 0, mode & 0xff, 0x11, lv & 0xff, 0, (mode + 1) & 0xff, 0x11, 1]); }
+const INIT = new Uint8Array([1, 1, 0, 1, 0, 0xc8, 0x11, 1]);
+
+async function writeRaw(buf, label) {
+  if (!writeChar) return false;
+  try {
+    if (writeMode === 'wnr') await writeChar.writeValueWithoutResponse(buf);
+    else if (writeMode === 'w') await writeChar.writeValue(buf);
+    else { try { await writeChar.writeValue(buf); writeMode = 'w'; } catch (e) { await writeChar.writeValueWithoutResponse(buf); writeMode = 'wnr'; } }
+    diag('✓ ' + (label || '') + ' (' + writeMode + '): ' + hex(buf));
+    return true;
+  } catch (e) { diag('✗ 写失败' + (label || '') + ': ' + (e.message || e)); return false; }
+}
+// 应用某通道强度：发该通道的帧，并设为保活帧
+const LBL = { suck: 'sV', vibrate: 'vV', ems: 'eV' };
+async function apply(ch, lv) {
+  lv = Math.max(0, Math.min(CAP[ch], lv | 0));
+  level[ch] = lv;
+  $(ch).value = lv; $(LBL[ch]).textContent = lv;
+  await writeRaw(FRAME(MODE[ch], lv), ch + '=' + lv);
+}
+// 全停:对每个通道都发 0(之前只停了吮吸mode7,震动/电不停)
+async function stopAll() {
+  for (const ch of ['vibrate', 'ems', 'suck']) { level[ch] = 0; $(ch).value = 0; $(LBL[ch]).textContent = '0'; await writeRaw(FRAME(MODE[ch], 0), '停' + ch); }
+}
+
+async function connect() {
+  try {
+    diagBuf = ''; setStatus('搜索中…'); diag('请求 SOSEXY…');
+    device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'SOSEXY' }, { namePrefix: 'sosexy' }], optionalServices: [SVC] });
+    diag('设备: ' + (device.name || '(无名)'));
+    device.addEventListener('gattserverdisconnected', onDisc);
+    setStatus('连接中…'); const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+    writeChar = await svc.getCharacteristic(WRITE);
+    writeMode = writeChar.properties.write ? 'w' : (writeChar.properties.writeWithoutResponse ? 'wnr' : 'w');
+    diag('写特征就绪 mode=' + writeMode);
+    await writeRaw(INIT, 'INIT');
+    setStatus('已连接 · 屿能控你了', 'on'); $('ctrl').style.display = 'block'; $('connBtn').textContent = '断开';
+    diag('自动试震: 吮吸60 → 1.5秒停');
+    await apply('suck', 60); setTimeout(() => apply('suck', 0), 1500);
+    heartbeat(); if (!polling) { polling = true; poll(); }
+  } catch (e) { setStatus('没连上：' + (e.message || e), 'warn'); diag('连接错误: ' + (e.message || e)); writeChar = null; }
+}
+function onDisc() { writeChar = null; writeMode = ''; curFrame = null; setStatus('断开了', 'warn'); $('ctrl').style.display = 'none'; $('connBtn').textContent = '重新连接 ▸'; heartbeat(); }
+
+$('connBtn').onclick = () => { if (isConn()) { try { device.gatt.disconnect(); } catch {} } else connect(); };
+$('stopBtn').onclick = stopAll;
+$('copyBtn').onclick = () => { navigator.clipboard.writeText(diagBuf).then(() => diag('(已复制)')); };
+['suck', 'vibrate', 'ems'].forEach(ch => $(ch).addEventListener('change', e => apply(ch, +e.target.value)));
+
+async function heartbeat() { try { await fetch('/toy/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ connected: isConn() }) }); } catch {} }
+setInterval(heartbeat, 10000);
+// 保活：每 18 秒把每个活跃通道重发一遍，否则玩具会自己停(参考实现同款,多通道逐个保活)
+setInterval(() => { if (!isConn()) return; for (const ch of ['suck', 'vibrate', 'ems']) if (level[ch] > 0) writeRaw(FRAME(MODE[ch], level[ch]), '保活' + ch); }, 18000);
+
+async function poll() {
+  try {
+    const r = await fetch('/toy/pull', { cache: 'no-store' }); const d = await r.json();
+    if (d.safe) { await stopAll(); }
+    for (const c of (d.commands || [])) {
+      if (c.ch === 'stop') { await stopAll(); $('lastcmd').textContent = '屿：全停'; }
+      else if (MODE[c.ch] != null) { await apply(c.ch, c.intensity | 0); $('lastcmd').textContent = '屿：' + c.ch + ' → ' + level[c.ch]; if (navigator.vibrate) navigator.vibrate(8); }
+    }
+  } catch {}
+  setTimeout(poll, 1500);
+}
+</script>
+</body>
+</html>

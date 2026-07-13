@@ -1,0 +1,17 @@
+{
+  "name": "one-memory-two-doors",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Self-hosted AI companion backend — one memory, many doors (Telegram + Web PWA), driven by Claude Code.",
+  "license": "MIT",
+  "scripts": {
+    "hub": "bun run src/hub.ts",
+    "seed": "bun run src/seed-day-one.ts",
+    "setup-vapid": "npx web-push generate-vapid-keys --json > vapid-keys.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "web-push": "^3.6.0",
+    "ws": "^8.18.0"
+  }
+}

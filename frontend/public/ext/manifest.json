@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "屿 · 浏览器遥控",
+  "version": "1.0.0",
+  "description": "让屿能操作你的浏览器：开网页、读你在看什么、替你打字、控你屏幕。点扩展图标开/关。",
+  "permissions": ["tabs", "scripting", "activeTab", "storage", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "bg.js" },
+  "action": { "default_title": "屿遥控" }
+}
